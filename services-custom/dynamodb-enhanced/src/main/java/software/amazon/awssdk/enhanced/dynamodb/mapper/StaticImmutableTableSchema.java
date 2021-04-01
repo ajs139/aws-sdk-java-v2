@@ -41,6 +41,7 @@ import software.amazon.awssdk.enhanced.dynamodb.EnhancedType;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ConverterProviderResolver;
 import software.amazon.awssdk.enhanced.dynamodb.internal.mapper.ResolvedImmutableAttribute;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPreserveEmptyBean;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 /**
@@ -84,6 +85,7 @@ public final class StaticImmutableTableSchema<T, B> implements TableSchema<T> {
     private final AttributeConverterProvider attributeConverterProvider;
     private final Map<String, FlattenedMapper<T, B, ?>> indexedFlattenedMappers;
     private final List<String> attributeNames;
+    private final boolean preserveEmtpyBean;
     
     private static class FlattenedMapper<T, B, T1> {
         private final Function<T, T1> otherItemGetter;
@@ -208,6 +210,7 @@ public final class StaticImmutableTableSchema<T, B> implements TableSchema<T> {
         this.buildItemFunction = builder.buildItemFunction;
         this.tableMetadata = tableMetadataBuilder.build();
         this.itemType = EnhancedType.of(builder.itemClass);
+        this.preserveEmtpyBean = builder.itemClass.getAnnotation(DynamoDbPreserveEmptyBean.class) != null;
     }
 
     /**
@@ -439,8 +442,14 @@ public final class StaticImmutableTableSchema<T, B> implements TableSchema<T> {
 
     @Override
     public T mapToItem(Map<String, AttributeValue> attributeMap) {
-        // Lazily instantiate the builder once we have an attribute to write
         B builder = null;
+
+        // Instantiate the builder right now if preserveEmtpyBean is true, otherwise lazily instantiate the builder once
+        // we have an attribute to write
+        if (preserveEmtpyBean) {
+            builder = constructNewBuilder();
+        }
+
         Map<FlattenedMapper<T, B, ?>, Map<String, AttributeValue>> flattenedAttributeValuesMap = new LinkedHashMap<>();
         
         for (Map.Entry<String, AttributeValue> entry : attributeMap.entrySet()) {

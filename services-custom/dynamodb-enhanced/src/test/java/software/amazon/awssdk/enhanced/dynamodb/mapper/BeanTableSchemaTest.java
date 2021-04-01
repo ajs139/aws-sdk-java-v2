@@ -22,6 +22,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasEntry;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.nullValue;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.binaryValue;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.numberValue;
 import static software.amazon.awssdk.enhanced.dynamodb.internal.AttributeValues.stringValue;
@@ -57,9 +58,11 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.InvalidBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.ListBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.MapBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.MultipleConverterProvidersBean;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.NestedBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.NoConstructorConverterProvidersBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.ParameterizedAbstractBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.ParameterizedDocumentBean;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.PreserveEmptyBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.PrimitiveTypesBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.RemappedAttributeBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.testbeans.SecondaryIndexBean;
@@ -171,6 +174,36 @@ public class BeanTableSchemaTest {
         assertThat(itemMap, hasEntry("id", stringValue("id-value")));
         assertThat(itemMap, hasEntry("attribute1", stringValue("one")));
         assertThat(itemMap, hasEntry("attribute2", stringValue("two")));
+    }
+
+    @Test
+    public void dynamoDbPreserveEmptyBean_shouldInitializeAsEmptyClass() {
+        BeanTableSchema<PreserveEmptyBean> beanTableSchema = BeanTableSchema.create(PreserveEmptyBean.class);
+        PreserveEmptyBean bean = new PreserveEmptyBean();
+
+        Map<String, AttributeValue> itemMap = beanTableSchema.itemToMap(bean, false);
+        PreserveEmptyBean resultBean = beanTableSchema.mapToItem(itemMap);
+        assertThat(resultBean, is(bean));
+    }
+
+    @Test
+    public void dynamoDbNestedBean_shouldInitializeEmptyClassForPreserveEmptyBean() {
+        BeanTableSchema<NestedBean> beanTableSchema = BeanTableSchema.create(NestedBean.class);
+        PreserveEmptyBean innerPreserveEmptyBean = new PreserveEmptyBean();
+        NestedBean bean = new NestedBean();
+
+        AbstractBean abstractBean = new AbstractBean();
+        bean.setId("id-value");
+        bean.setIntegerAttribute(1);
+        bean.setInnerPreserveEmptyBean(innerPreserveEmptyBean);
+        bean.setInnerBean(abstractBean);
+
+        Map<String, AttributeValue> itemMap = beanTableSchema.itemToMap(bean, true);
+        assertThat(itemMap.size(), is(4));
+
+        NestedBean nestedBean = beanTableSchema.mapToItem(itemMap);
+        assertThat(nestedBean.getInnerPreserveEmptyBean(), is(innerPreserveEmptyBean));
+        assertThat(nestedBean.getInnerBean(), is(nullValue()));
     }
 
     @Test
